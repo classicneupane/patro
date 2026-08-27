@@ -1,0 +1,20 @@
+[project]
+name = "patro"
+version = "0.1.0"
+description = "Nepali Bikram Sambat <-> Gregorian date converter"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/patro"]
