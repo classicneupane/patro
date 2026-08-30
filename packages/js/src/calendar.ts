@@ -9,4 +9,4 @@ const _raw: Record<string, number[]> = JSON.parse(
 )
 
 export const CALENDAR: Record<number, readonly [number, number, number, number, number, number, number, number, number, number, number, number]> =
-  Object.fromEntries(Object.entries(_raw).map(([k, v]) => [Number(k), v])) as Record<number, readonly [number, number, number, number, number, number, number, number, number, number, number, number]>
+  Object.fromEntries(Object.entries(_raw).map(([k, v]) => [Number(k), v])) as unknown as Record<number, readonly [number, number, number, number, number, number, number, number, number, number, number, number]>
