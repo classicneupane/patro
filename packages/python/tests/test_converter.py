@@ -1,13 +1,15 @@
 """
 Comprehensive tests for the patro Nepali BS <-> AD date converter.
 
-Conversion pairs are loaded from testdata/pairs.json at the monorepo root —
+All test-case data is loaded from testdata/cases.json at the monorepo root —
 a single source of truth shared with the TypeScript test suite.
+To add new test cases, edit testdata/cases.json only.
 
 Test pairs marked [✓] or [✓✓] were cross-verified against external reference implementations.
 """
 
 import json
+import functools
 import pytest
 from datetime import date
 from pathlib import Path
@@ -20,19 +22,21 @@ from patro import (
 
 
 # ---------------------------------------------------------------------------
-# Load shared test pairs
+# Load shared test cases
 # ---------------------------------------------------------------------------
 
-_PAIRS_FILE = Path(__file__).parents[3] / "testdata" / "pairs.json"
-PAIRS = json.loads(_PAIRS_FILE.read_text())
+_CASES_FILE = Path(__file__).parents[3] / "testdata" / "cases.json"
+CASES = json.loads(_CASES_FILE.read_text())
 
-
-def _ad(p: dict) -> tuple[int, int, int]:
-    return tuple(p["ad"])  # type: ignore[return-value]
-
-
-def _bs(p: dict) -> tuple[int, int, int]:
-    return tuple(p["bs"])  # type: ignore[return-value]
+PAIRS = CASES["conversion_pairs"]
+AD_OUT_OF_RANGE = CASES["ad_to_bs_out_of_range"]
+BS_INVALID = CASES["bs_to_ad_invalid"]
+DAYS_IN_MONTH_CASES = CASES["days_in_month"]
+DAYS_IN_MONTH_OOR = CASES["days_in_month_out_of_range"]
+VALID_BS = CASES["valid_bs_dates"]
+INVALID_BS = CASES["invalid_bs_dates"]
+ROUND_TRIP_BS = CASES["round_trip_bs"]
+ROUND_TRIP_AD = CASES["round_trip_ad"]
 
 
 def _pair_id(p: dict) -> str:
@@ -42,7 +46,7 @@ def _pair_id(p: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Conversion pairs (testdata/pairs.json) — single source of truth
+# Conversion pairs — single source of truth
 # ---------------------------------------------------------------------------
 
 class TestAdToBsPairs:
@@ -64,67 +68,35 @@ class TestBsToAdPairs:
 
 
 # ---------------------------------------------------------------------------
-# ad_to_bs — range errors
+# ad_to_bs — out-of-range errors
 # ---------------------------------------------------------------------------
 
-class TestAdToBsErrors:
+class TestAdToBsOutOfRange:
 
-    def test_before_min_raises(self):
-        with pytest.raises(ValueError, match="before"):
-            ad_to_bs(1918, 4, 12)
-
-    def test_well_before_min_raises(self):
+    @pytest.mark.parametrize(
+        "y,m,d,note",
+        [(p["ad"][0], p["ad"][1], p["ad"][2], p.get("note", "")) for p in AD_OUT_OF_RANGE],
+        ids=[f"AD{p['ad'][0]}-{p['ad'][1]:02d}-{p['ad'][2]:02d}" for p in AD_OUT_OF_RANGE],
+    )
+    def test_out_of_range_raises(self, y, m, d, note):
         with pytest.raises(ValueError):
-            ad_to_bs(1900, 1, 1)
-
-    def test_after_max_raises(self):
-        with pytest.raises(ValueError):
-            ad_to_bs(2044, 4, 14)
-
-    def test_well_after_max_raises(self):
-        with pytest.raises(ValueError):
-            ad_to_bs(2100, 1, 1)
-
-    @pytest.mark.parametrize("ad_y,ad_m,ad_d,bs_y,bs_m,bs_d", [
-        (2005,  4, 13, 2061, 12, 31),  # last  day of BS 2061
-        (2005,  4, 14, 2062,  1,  1),  # first day of BS 2062
-        (2006,  4, 13, 2062, 12, 31),  # last  day of BS 2062
-        (2006,  4, 14, 2063,  1,  1),  # first day of BS 2063
-        (2031,  4, 15, 2087, 12, 30),  # last  day of BS 2087 (367 days)
-        (2031,  4, 16, 2088,  1,  1),  # first day of BS 2088
-    ])
-    def test_year_rollovers(self, ad_y, ad_m, ad_d, bs_y, bs_m, bs_d):
-        assert ad_to_bs(ad_y, ad_m, ad_d) == (bs_y, bs_m, bs_d)
+            ad_to_bs(y, m, d)
 
 
 # ---------------------------------------------------------------------------
-# bs_to_ad — validation errors
+# bs_to_ad — invalid input errors
 # ---------------------------------------------------------------------------
 
-class TestBsToAdErrors:
+class TestBsToAdInvalid:
 
-    @pytest.mark.parametrize("y,m,d,match", [
-        (1974,  1,  1, "year"),   # year too low
-        (2101,  1,  1, "year"),   # year too high
-        (2083,  0,  1, "month"),  # month 0
-        (2083, 13,  1, "month"),  # month 13
-        (2083, -1,  1, "month"),  # negative month
-        (2083,  1,  0, "day"),    # day 0
-        (2083,  1, -1, "day"),    # negative day
-        (2083,  1, 32, "day"),    # day 32 (Baisakh 2083 = 31)
-        (2062,  1, 32, "day"),    # day 32 (Baisakh 2062 = 31)
-        (2087,  8, 31, "day"),    # day 31 (Mangsir 2087 = 30)
-        (2087,  9, 31, "day"),    # day 31 (Poush 2087 = 30)
-    ])
-    def test_invalid_input_raises(self, y, m, d, match):
+    @pytest.mark.parametrize(
+        "y,m,d,reason",
+        [(p["bs"][0], p["bs"][1], p["bs"][2], p["reason"]) for p in BS_INVALID],
+        ids=[f"BS{p['bs'][0]}-{p['bs'][1]}-{p['bs'][2]}" for p in BS_INVALID],
+    )
+    def test_invalid_input_raises(self, y, m, d, reason):
         with pytest.raises(ValueError):
             bs_to_ad(y, m, d)
-
-    def test_last_valid_day_of_short_month(self):
-        """Day = max days in month should succeed, day = max+1 should fail."""
-        assert bs_to_ad(2083, 8, 29) == date(2026, 12, 15)   # Mangsir 2083 = 29 days
-        with pytest.raises(ValueError):
-            bs_to_ad(2083, 8, 30)
 
 
 # ---------------------------------------------------------------------------
@@ -133,46 +105,22 @@ class TestBsToAdErrors:
 
 class TestDaysInMonth:
 
-    @pytest.mark.parametrize("month,expected", [
-        (1, 31), (2, 31), (3, 32), (4, 31),
-        (5, 31), (6, 31), (7, 30), (8, 29),
-        (9, 30), (10, 29), (11, 30), (12, 30),
-    ])
-    def test_bs2083_all_months(self, month, expected):
-        assert days_in_month(2083, month) == expected
+    @pytest.mark.parametrize(
+        "year,month,expected,note",
+        [(c["year"], c["month"], c["expected"], c.get("note", "")) for c in DAYS_IN_MONTH_CASES],
+        ids=[f"BS{c['year']}-m{c['month']:02d}" for c in DAYS_IN_MONTH_CASES],
+    )
+    def test_valid(self, year, month, expected, note):
+        assert days_in_month(year, month) == expected
 
-    def test_bs2062_baisakh_is_31(self):
-        """[✓] BS 2062 Baisakh = 31."""
-        assert days_in_month(2062, 1) == 31
-
-    def test_bs2062_jestha_is_31(self):
-        """[✓] BS 2062 Jestha = 31."""
-        assert days_in_month(2062, 2) == 31
-
-    def test_bs2087_mangsir_is_30(self):
-        """[✓✓] BS 2087 Mangsir = 30."""
-        assert days_in_month(2087, 8) == 30
-
-    def test_bs2087_poush_is_30(self):
-        """[✓✓] BS 2087 Poush = 30."""
-        assert days_in_month(2087, 9) == 30
-
-    @pytest.mark.parametrize("y,m,expected", [
-        (1975,  3, 32),  # Ashadh often has 32 days
-        (2000,  1, 30),  # Baisakh 2000 = 30
-        (2050,  4, 32),  # Shrawan with 32 days
-        (2100, 12, 30),  # last month of last year
-    ])
-    def test_various_months(self, y, m, expected):
-        assert days_in_month(y, m) == expected
-
-    @pytest.mark.parametrize("y,m", [
-        (1974, 1), (2101, 1),   # year out of range
-        (2083, 0), (2083, 13),  # month out of range
-    ])
-    def test_out_of_range_raises(self, y, m):
+    @pytest.mark.parametrize(
+        "year,month,reason",
+        [(c["year"], c["month"], c["reason"]) for c in DAYS_IN_MONTH_OOR],
+        ids=[f"BS{c['year']}-m{c['month']}" for c in DAYS_IN_MONTH_OOR],
+    )
+    def test_out_of_range_raises(self, year, month, reason):
         with pytest.raises(ValueError):
-            days_in_month(y, m)
+            days_in_month(year, month)
 
 
 # ---------------------------------------------------------------------------
@@ -181,30 +129,20 @@ class TestDaysInMonth:
 
 class TestIsValidBs:
 
-    @pytest.mark.parametrize("y,m,d", [
-        (1975,  1,  1),   # min date
-        (2083,  5, 11),   # today
-        (2100, 12, 30),   # max date
-        (2062,  1, 31),   # Baisakh 2062 last day (31, not 30)
-        (2087,  8, 30),   # Mangsir 2087 last day (30, not 29)
-        (2087,  9, 30),   # Poush 2087 last day (30, not 29)
-        (2083,  3, 32),   # Ashadh 2083 = 32 days
-    ])
-    def test_valid_dates(self, y, m, d):
+    @pytest.mark.parametrize(
+        "y,m,d,note",
+        [(c["bs"][0], c["bs"][1], c["bs"][2], c.get("note", "")) for c in VALID_BS],
+        ids=[f"BS{c['bs'][0]}-{c['bs'][1]:02d}-{c['bs'][2]:02d}" for c in VALID_BS],
+    )
+    def test_valid_dates(self, y, m, d, note):
         assert is_valid_bs(y, m, d) is True
 
-    @pytest.mark.parametrize("y,m,d", [
-        (1974,  1,  1),   # year too low
-        (2101,  1,  1),   # year too high
-        (2083,  0,  1),   # month 0
-        (2083, 13,  1),   # month 13
-        (2083,  1,  0),   # day 0
-        (2083,  1, 32),   # day > max (Baisakh 2083 = 31)
-        (2062,  1, 32),   # day > max (Baisakh 2062 = 31)
-        (2087,  8, 31),   # day > max (Mangsir 2087 = 30)
-        (2083,  3, 33),   # day > max (Ashadh 2083 = 32)
-    ])
-    def test_invalid_dates(self, y, m, d):
+    @pytest.mark.parametrize(
+        "y,m,d,reason",
+        [(c["bs"][0], c["bs"][1], c["bs"][2], c["reason"]) for c in INVALID_BS],
+        ids=[f"BS{c['bs'][0]}-{c['bs'][1]}-{c['bs'][2]}" for c in INVALID_BS],
+    )
+    def test_invalid_dates(self, y, m, d, reason):
         assert is_valid_bs(y, m, d) is False
 
 
@@ -250,7 +188,6 @@ class TestCompareBs:
     def test_is_equal_false(self):  assert is_equal(self.A, self.B) is False
 
     def test_usable_as_sort_key(self):
-        import functools
         dates = [self.B, self.A, self.C]
         assert sorted(dates, key=functools.cmp_to_key(compare_bs)) == [self.A, self.B, self.C]
 
@@ -261,42 +198,22 @@ class TestCompareBs:
 
 class TestRoundTrip:
 
-    @pytest.mark.parametrize("y,m,d", [
-        (1975,  1,  1),   # min
-        (1975, 12, 30),   # end of first year
-        (2000,  1,  1),   # year 2000
-        (2000,  6, 15),   # mid year
-        (2062,  1,  1),   # Baisakh 2062 start
-        (2062,  1, 31),   # Baisakh 2062 last (corrected)
-        (2062,  2, 31),   # Jestha 2062 last (corrected)
-        (2083,  5, 11),   # today
-        (2083,  3, 32),   # 32-day month last day
-        (2083,  8, 29),   # 29-day month last day
-        (2087,  1,  1),   # first day of corrected year
-        (2087,  8, 30),   # Mangsir last (corrected)
-        (2087,  9, 30),   # Poush last (corrected)
-        (2087, 12, 30),   # last day of BS 2087
-        (2100, 12, 30),   # max
-    ])
-    def test_bs_roundtrip(self, y, m, d):
+    @pytest.mark.parametrize(
+        "y,m,d,note",
+        [(c["bs"][0], c["bs"][1], c["bs"][2], c.get("note", "")) for c in ROUND_TRIP_BS],
+        ids=[f"BS{c['bs'][0]}-{c['bs'][1]:02d}-{c['bs'][2]:02d}" for c in ROUND_TRIP_BS],
+    )
+    def test_bs_roundtrip(self, y, m, d, note):
         """bs_to_ad → ad_to_bs must return the original BS date."""
         ad_date = bs_to_ad(y, m, d)
         assert ad_to_bs(ad_date.year, ad_date.month, ad_date.day) == (y, m, d)
 
-    @pytest.mark.parametrize("y,m,d", [
-        (1918,  4, 13),   # reference anchor
-        (1940,  1,  1),
-        (1960,  6, 15),
-        (2000,  1,  1),
-        (2005,  5, 14),   # BS 2062 Baisakh last
-        (2005,  6, 14),   # BS 2062 Jestha last
-        (2026,  8, 27),   # today
-        (2030, 12, 16),   # BS 2087 Mangsir last
-        (2031,  1, 15),   # BS 2087 Poush last
-        (2031,  4, 16),   # BS 2088 start
-        (2044,  4, 13),   # max AD date
-    ])
-    def test_ad_roundtrip(self, y, m, d):
+    @pytest.mark.parametrize(
+        "y,m,d,note",
+        [(c["ad"][0], c["ad"][1], c["ad"][2], c.get("note", "")) for c in ROUND_TRIP_AD],
+        ids=[f"AD{c['ad'][0]}-{c['ad'][1]:02d}-{c['ad'][2]:02d}" for c in ROUND_TRIP_AD],
+    )
+    def test_ad_roundtrip(self, y, m, d, note):
         """ad_to_bs → bs_to_ad must return the original AD date."""
         bs = ad_to_bs(y, m, d)
         assert bs_to_ad(bs[0], bs[1], bs[2]) == date(y, m, d)
