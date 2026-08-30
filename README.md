@@ -5,8 +5,6 @@ Nepali Bikram Sambat (BS) ↔ Gregorian (AD) date converter.
 - **Coverage:** BS 1975–2100 / AD 1918–2044 (46,023 days)
 - **Zero dependencies** — pure TypeScript and pure Python
 
-Full API specification: [docs/spec.md](docs/spec.md)
-
 ---
 
 ## Installation
@@ -89,8 +87,6 @@ isValidBs(2083,  5, 11) // → true
 ---
 
 ## API
-
-See [docs/spec.md](docs/spec.md) for the full specification. Quick reference:
 
 | Function | JS/TS | Python | Returns |
 |---|---|---|---|
