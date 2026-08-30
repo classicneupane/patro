@@ -12,11 +12,14 @@ Public API:
     next_bs_month(year, month) -> (year, month)
     prev_bs_month(year, month) -> (year, month)
     parse_bs(date_str) -> (bs_year, bs_month, bs_day)
-    bs_date_to_string(year, month, day) -> str
+    format_bs(year, month, day) -> str
     parse_ad(date_str) -> datetime.date
     day_of_week_bs(year, month, day) -> int  (0=Sunday)
     days_in_year(year) -> int
     compare_bs(a, b) -> int  (-1 | 0 | 1)
+    is_before(a, b) -> bool
+    is_after(a, b) -> bool
+    is_equal(a, b) -> bool
 """
 
 from patro._converter import ad_to_bs, bs_to_ad, days_in_month, is_valid_bs
@@ -30,11 +33,11 @@ from patro._utils import (
     to_nepali_digits,
     today_bs,
     next_bs_month, prev_bs_month,
-    parse_bs, bs_date_to_string,
+    parse_bs, format_bs,
     parse_ad,
     day_of_week_bs,
     days_in_year,
-    compare_bs,
+    compare_bs, is_before, is_after, is_equal,
 )
 
 __all__ = [
@@ -46,9 +49,9 @@ __all__ = [
     "to_nepali_digits",
     "today_bs",
     "next_bs_month", "prev_bs_month",
-    "parse_bs", "bs_date_to_string",
+    "parse_bs", "format_bs",
     "parse_ad",
     "day_of_week_bs",
     "days_in_year",
-    "compare_bs",
+    "compare_bs", "is_before", "is_after", "is_equal",
 ]

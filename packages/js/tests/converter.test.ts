@@ -12,7 +12,10 @@ import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { adToBs, bsToAd, daysInMonth, isValidBs } from '../src/converter.js'
-import { CALENDAR, MIN_BS_YEAR, MAX_BS_YEAR } from '../src/index.js'
+import {
+  CALENDAR, MIN_BS_YEAR, MAX_BS_YEAR,
+  formatBs, parseBs, compareBs, isBefore, isAfter, isEqual,
+} from '../src/index.js'
 
 // ---------------------------------------------------------------------------
 // Load shared test pairs
@@ -251,6 +254,53 @@ describe('isValidBs', () => {
       expect(isValidBs(y, m, d)).toBe(false)
     })
   }
+})
+
+// ---------------------------------------------------------------------------
+// formatBs / parseBs
+// ---------------------------------------------------------------------------
+
+describe('formatBs', () => {
+  it('zero-pads month and day', () => {
+    expect(formatBs({ year: 2083, month: 5, day: 11 })).toBe('2083-05-11')
+  })
+  it('handles single-digit month and day', () => {
+    expect(formatBs({ year: 1975, month: 1, day: 1 })).toBe('1975-01-01')
+  })
+  it('round-trips with parseBs', () => {
+    const bs = { year: 2083, month: 5, day: 11 }
+    expect(parseBs(formatBs(bs))).toEqual(bs)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// compareBs / isBefore / isAfter / isEqual
+// ---------------------------------------------------------------------------
+
+describe('compareBs / isBefore / isAfter / isEqual', () => {
+  const a = { year: 2083, month: 5, day: 10 }
+  const b = { year: 2083, month: 5, day: 11 }
+  const c = { year: 2083, month: 5, day: 11 }
+
+  it('compareBs: a < b → -1', () => expect(compareBs(a, b)).toBe(-1))
+  it('compareBs: b > a → 1',  () => expect(compareBs(b, a)).toBe(1))
+  it('compareBs: equal → 0',  () => expect(compareBs(b, c)).toBe(0))
+
+  it('isBefore: a < b → true',  () => expect(isBefore(a, b)).toBe(true))
+  it('isBefore: b < a → false', () => expect(isBefore(b, a)).toBe(false))
+  it('isBefore: equal → false', () => expect(isBefore(b, c)).toBe(false))
+
+  it('isAfter: b > a → true',   () => expect(isAfter(b, a)).toBe(true))
+  it('isAfter: a > b → false',  () => expect(isAfter(a, b)).toBe(false))
+  it('isAfter: equal → false',  () => expect(isAfter(b, c)).toBe(false))
+
+  it('isEqual: same day → true',      () => expect(isEqual(b, c)).toBe(true))
+  it('isEqual: different day → false', () => expect(isEqual(a, b)).toBe(false))
+
+  it('usable as sort comparator', () => {
+    const dates = [b, a, c]
+    expect(dates.sort(compareBs)).toEqual([a, b, c])
+  })
 })
 
 // ---------------------------------------------------------------------------

@@ -28,7 +28,7 @@ npm install patro
 ### Python
 
 ```python
-from patro import ad_to_bs, bs_to_ad, today_bs, parse_bs, bs_date_to_string
+from patro import ad_to_bs, bs_to_ad, today_bs, parse_bs, format_bs
 
 # AD → BS
 ad_to_bs(2026, 8, 27)           # → (2083, 5, 11)
@@ -41,13 +41,13 @@ today_bs()                      # → (2083, 5, 14)
 
 # parse / format strings
 parse_bs("2083-05-11")          # → (2083, 5, 11)
-bs_date_to_string(2083, 5, 11)  # → "2083-05-11"
+format_bs(2083, 5, 11)          # → "2083-05-11"
 ```
 
 ### TypeScript / JavaScript
 
 ```ts
-import { adToBs, bsToAd, todayBs, parseBs, bsDateToString } from 'patro'
+import { adToBs, bsToAd, todayBs, parseBs, formatBs } from 'patro'
 
 // AD → BS
 adToBs(2026, 8, 27)             // → { year: 2083, month: 5, day: 11 }
@@ -60,7 +60,7 @@ todayBs()                       // → { year: 2083, month: 5, day: 14 }
 
 // parse / format strings
 parseBs("2083-05-11")           // → { year: 2083, month: 5, day: 11 }
-bsDateToString({ year: 2083, month: 5, day: 11 }) // → "2083-05-11"
+formatBs({ year: 2083, month: 5, day: 11 })       // → "2083-05-11"
 ```
 
 ---
@@ -81,10 +81,13 @@ Both packages expose the same functions — snake_case in Python, camelCase in J
 | **Utilities** | | | |
 | Today in BS | `todayBs()` | `today_bs()` | BS date |
 | Parse BS string | `parseBs(s)` | `parse_bs(s)` | BS date |
-| Format BS string | `bsDateToString(d)` | `bs_date_to_string(y, m, d)` | `str` |
+| Format BS string | `formatBs(d)` | `format_bs(y, m, d)` | `str` |
 | Parse AD string | `parseAd(s)` | `parse_ad(s)` | AD date |
 | Day of week | `dayOfWeekBs(y, m, d)` | `day_of_week_bs(y, m, d)` | `int` (0 = Sun) |
 | Compare dates | `compareBs(a, b)` | `compare_bs(a, b)` | `-1 \| 0 \| 1` |
+| Is before | `isBefore(a, b)` | `is_before(a, b)` | `bool` |
+| Is after | `isAfter(a, b)` | `is_after(a, b)` | `bool` |
+| Is equal | `isEqual(a, b)` | `is_equal(a, b)` | `bool` |
 | Next month | `nextBsMonth(y, m)` | `next_bs_month(y, m)` | year, month |
 | Prev month | `prevBsMonth(y, m)` | `prev_bs_month(y, m)` | year, month |
 | **i18n** | | | |

@@ -11,9 +11,9 @@ export {
   toNepaliDigits,
   todayBs,
   nextBsMonth, prevBsMonth,
-  parseBs, bsDateToString,
+  parseBs, formatBs,
   parseAd,
   dayOfWeekBs,
   daysInYear,
-  compareBs,
+  compareBs, isBefore, isAfter, isEqual,
 } from './utils.js'

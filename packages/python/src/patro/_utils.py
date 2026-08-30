@@ -52,7 +52,7 @@ def parse_bs(date_str: str) -> tuple[int, int, int]:
     return (y, m, d)
 
 
-def bs_date_to_string(year: int, month: int, day: int) -> str:
+def format_bs(year: int, month: int, day: int) -> str:
     """Format a BS date as a zero-padded YYYY-MM-DD string."""
     return f"{year}-{month:02d}-{day:02d}"
 
@@ -96,9 +96,25 @@ def compare_bs(
     """
     Compare two BS dates given as (year, month, day) tuples.
     Returns -1 if a < b, 0 if equal, 1 if a > b.
+    Useful as a sort key: sorted(dates, key=functools.cmp_to_key(compare_bs)).
     """
     if a < b:
         return -1
     if a > b:
         return 1
     return 0
+
+
+def is_before(a: tuple[int, int, int], b: tuple[int, int, int]) -> bool:
+    """Return True if BS date a is before b."""
+    return a < b
+
+
+def is_after(a: tuple[int, int, int], b: tuple[int, int, int]) -> bool:
+    """Return True if BS date a is after b."""
+    return a > b
+
+
+def is_equal(a: tuple[int, int, int], b: tuple[int, int, int]) -> bool:
+    """Return True if two BS dates represent the same day."""
+    return a == b

@@ -12,7 +12,11 @@ import pytest
 from datetime import date
 from pathlib import Path
 
-from patro import ad_to_bs, bs_to_ad, days_in_month, is_valid_bs, CALENDAR, MIN_BS_YEAR, MAX_BS_YEAR
+from patro import (
+    ad_to_bs, bs_to_ad, days_in_month, is_valid_bs,
+    CALENDAR, MIN_BS_YEAR, MAX_BS_YEAR,
+    format_bs, parse_bs, compare_bs, is_before, is_after, is_equal,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +206,53 @@ class TestIsValidBs:
     ])
     def test_invalid_dates(self, y, m, d):
         assert is_valid_bs(y, m, d) is False
+
+
+# ---------------------------------------------------------------------------
+# format_bs / parse_bs
+# ---------------------------------------------------------------------------
+
+class TestFormatBs:
+
+    def test_zero_pads_month_and_day(self):
+        assert format_bs(2083, 5, 11) == "2083-05-11"
+
+    def test_single_digit_parts(self):
+        assert format_bs(1975, 1, 1) == "1975-01-01"
+
+    def test_round_trips_with_parse_bs(self):
+        assert parse_bs(format_bs(2083, 5, 11)) == (2083, 5, 11)
+
+
+# ---------------------------------------------------------------------------
+# compare_bs / is_before / is_after / is_equal
+# ---------------------------------------------------------------------------
+
+class TestCompareBs:
+
+    A = (2083, 5, 10)
+    B = (2083, 5, 11)
+    C = (2083, 5, 11)
+
+    def test_compare_less(self):    assert compare_bs(self.A, self.B) == -1
+    def test_compare_greater(self): assert compare_bs(self.B, self.A) == 1
+    def test_compare_equal(self):   assert compare_bs(self.B, self.C) == 0
+
+    def test_is_before_true(self):  assert is_before(self.A, self.B) is True
+    def test_is_before_false(self): assert is_before(self.B, self.A) is False
+    def test_is_before_equal(self): assert is_before(self.B, self.C) is False
+
+    def test_is_after_true(self):   assert is_after(self.B, self.A) is True
+    def test_is_after_false(self):  assert is_after(self.A, self.B) is False
+    def test_is_after_equal(self):  assert is_after(self.B, self.C) is False
+
+    def test_is_equal_true(self):   assert is_equal(self.B, self.C) is True
+    def test_is_equal_false(self):  assert is_equal(self.A, self.B) is False
+
+    def test_usable_as_sort_key(self):
+        import functools
+        dates = [self.B, self.A, self.C]
+        assert sorted(dates, key=functools.cmp_to_key(compare_bs)) == [self.A, self.B, self.C]
 
 
 # ---------------------------------------------------------------------------

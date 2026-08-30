@@ -58,7 +58,7 @@ export function parseBs(dateStr: string): BsDate {
  * Format a BS date as a `YYYY-MM-DD` string (zero-padded).
  * This is the canonical string representation used in database fields.
  */
-export function bsDateToString(date: BsDate): string {
+export function formatBs(date: BsDate): string {
   return `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`
 }
 
@@ -102,11 +102,26 @@ export function parseAd(dateStr: string): AdDate {
 
 /**
  * Compare two BS dates. Returns -1 if a < b, 0 if equal, 1 if a > b.
- * Useful for sorting arrays of BS dates.
+ * Useful as a sort comparator: `dates.sort(compareBs)`.
  */
 export function compareBs(a: BsDate, b: BsDate): -1 | 0 | 1 {
   if (a.year !== b.year) return a.year < b.year ? -1 : 1
   if (a.month !== b.month) return a.month < b.month ? -1 : 1
   if (a.day !== b.day) return a.day < b.day ? -1 : 1
   return 0
+}
+
+/** Return true if BS date `a` is before `b`. */
+export function isBefore(a: BsDate, b: BsDate): boolean {
+  return compareBs(a, b) === -1
+}
+
+/** Return true if BS date `a` is after `b`. */
+export function isAfter(a: BsDate, b: BsDate): boolean {
+  return compareBs(a, b) === 1
+}
+
+/** Return true if two BS dates represent the same day. */
+export function isEqual(a: BsDate, b: BsDate): boolean {
+  return compareBs(a, b) === 0
 }
