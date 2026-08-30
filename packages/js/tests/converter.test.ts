@@ -1,199 +1,61 @@
 /**
  * Comprehensive tests for the patro Nepali BS <-> AD date converter.
  *
- * All AD<->BS pairs marked with [H] are verified against Hamropatro (gold standard).
- * All pairs marked with [A] are verified against prabinghimire1 API.
- * Unmarked pairs are derived from the verified reference anchor via the algorithm.
+ * Conversion pairs are loaded from testdata/pairs.json at the monorepo root —
+ * a single source of truth shared with the Python test suite.
+ *
+ * Test pairs marked [✓] or [✓✓] were cross-verified against external reference implementations.
  */
 
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { adToBs, bsToAd, daysInMonth, isValidBs } from '../src/converter.js'
 import { CALENDAR, MIN_BS_YEAR, MAX_BS_YEAR } from '../src/index.js'
 
 // ---------------------------------------------------------------------------
-// adToBs
+// Load shared test pairs
 // ---------------------------------------------------------------------------
 
-describe('adToBs', () => {
+interface Pair {
+  ad: [number, number, number]
+  bs: [number, number, number]
+  note?: string
+}
 
-  // ── Reference & known spot checks ─────────────────────────────────────────
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const pairs: Pair[] = JSON.parse(
+  readFileSync(join(__dirname, '../../../testdata/pairs.json'), 'utf-8')
+)
 
-  it('[H] reference anchor: AD 1918-04-13 = BS 1975-01-01', () => {
-    expect(adToBs(1918, 4, 13)).toEqual({ year: 1975, month: 1, day: 1 })
-  })
+// ---------------------------------------------------------------------------
+// Conversion pairs (testdata/pairs.json) — single source of truth
+// ---------------------------------------------------------------------------
 
-  it('[H] today: AD 2026-08-27 = BS 2083-05-11', () => {
-    expect(adToBs(2026, 8, 27)).toEqual({ year: 2083, month: 5, day: 11 })
-  })
-
-  // ── Year boundaries — spread across full range ────────────────────────────
-
-  const yearBoundaries: Array<[number, number, number, number, number, number]> = [
-    [1918,  4, 13, 1975,  1,  1],   // first day of BS 1975
-    [1919,  4, 12, 1975, 12, 30],   // last  day of BS 1975
-    [1923,  4, 13, 1980,  1,  1],
-    [1924,  4, 12, 1980, 12, 31],
-    [1933,  4, 13, 1990,  1,  1],
-    [1934,  4, 12, 1990, 12, 30],
-    [1943,  4, 14, 2000,  1,  1],
-    [1944,  4, 12, 2000, 12, 31],
-    [1953,  4, 13, 2010,  1,  1],
-    [1954,  4, 12, 2010, 12, 30],
-    [1963,  4, 14, 2020,  1,  1],
-    [1964,  4, 12, 2020, 12, 30],
-    [1973,  4, 13, 2030,  1,  1],
-    [1974,  4, 13, 2030, 12, 31],
-    [1983,  4, 14, 2040,  1,  1],
-    [1984,  4, 12, 2040, 12, 30],
-    [1993,  4, 13, 2050,  1,  1],
-    [1994,  4, 13, 2050, 12, 31],
-    [2003,  4, 14, 2060,  1,  1],
-    [2004,  4, 12, 2060, 12, 30],
-    [2013,  4, 14, 2070,  1,  1],
-    [2014,  4, 13, 2070, 12, 30],
-    [2023,  4, 14, 2080,  1,  1],
-    [2024,  4, 12, 2080, 12, 30],
-    [2026,  4, 14, 2083,  1,  1],
-    [2027,  4, 13, 2083, 12, 30],
-    [2033,  4, 15, 2090,  1,  1],
-    [2034,  4, 14, 2090, 12, 30],
-    [2043,  4, 15, 2100,  1,  1],
-    [2044,  4, 13, 2100, 12, 30],  // last supported date
-  ]
-
-  for (const [ay, am, ad, by, bm, bd] of yearBoundaries) {
-    it(`AD ${ay}-${am}-${ad} = BS ${by}-${bm}-${bd}`, () => {
+describe('adToBs — shared pairs', () => {
+  for (const { ad: [ay, am, ad], bs: [by, bm, bd], note } of pairs) {
+    const label = `AD ${ay}-${String(am).padStart(2,'0')}-${String(ad).padStart(2,'0')} = BS ${by}-${String(bm).padStart(2,'0')}-${String(bd).padStart(2,'0')}${note ? ' (' + note + ')' : ''}`
+    it(label, () => {
       expect(adToBs(ay, am, ad)).toEqual({ year: by, month: bm, day: bd })
     })
   }
+})
 
-  // ── BS 2083 — all 12 months (current year, Hamropatro verified) [H] ───────
-
-  const bs2083Months: Array<[number, number, number, number, number]> = [
-    [2026,  4, 14,  1,  1],   // Baisakh 1
-    [2026,  5, 14,  1, 31],   // Baisakh 31 (last)
-    [2026,  5, 15,  2,  1],   // Jestha 1
-    [2026,  6, 14,  2, 31],   // Jestha 31 (last)
-    [2026,  6, 15,  3,  1],   // Ashadh 1
-    [2026,  7, 16,  3, 32],   // Ashadh 32 (last — 32-day month)
-    [2026,  7, 17,  4,  1],   // Shrawan 1
-    [2026,  8, 16,  4, 31],   // Shrawan 31 (last)
-    [2026,  8, 17,  5,  1],   // Bhadra 1
-    [2026,  9, 16,  5, 31],   // Bhadra 31 (last)
-    [2026,  9, 17,  6,  1],   // Ashwin 1
-    [2026, 10, 17,  6, 31],   // Ashwin 31 (last)
-    [2026, 10, 18,  7,  1],   // Kartik 1
-    [2026, 11, 16,  7, 30],   // Kartik 30 (last)
-    [2026, 11, 17,  8,  1],   // Mangsir 1
-    [2026, 12, 15,  8, 29],   // Mangsir 29 (last — 29-day month)
-    [2026, 12, 16,  9,  1],   // Poush 1
-    [2027,  1, 14,  9, 30],   // Poush 30 (last)
-    [2027,  1, 15, 10,  1],   // Magh 1
-    [2027,  2, 12, 10, 29],   // Magh 29 (last — 29-day month)
-    [2027,  2, 13, 11,  1],   // Falgun 1
-    [2027,  3, 14, 11, 30],   // Falgun 30 (last)
-    [2027,  3, 15, 12,  1],   // Chaitra 1
-    [2027,  4, 13, 12, 30],   // Chaitra 30 (last)
-  ]
-
-  for (const [ay, am, ad, bm, bd] of bs2083Months) {
-    it(`[H] BS 2083: AD ${ay}-${am}-${ad} = BS 2083-${bm}-${bd}`, () => {
-      expect(adToBs(ay, am, ad)).toEqual({ year: 2083, month: bm, day: bd })
+describe('bsToAd — shared pairs', () => {
+  for (const { ad: [ay, am, ad], bs: [by, bm, bd], note } of pairs) {
+    const label = `BS ${by}-${String(bm).padStart(2,'0')}-${String(bd).padStart(2,'0')} = AD ${ay}-${String(am).padStart(2,'0')}-${String(ad).padStart(2,'0')}${note ? ' (' + note + ')' : ''}`
+    it(label, () => {
+      expect(bsToAd(by, bm, bd)).toEqual({ year: ay, month: am, day: ad })
     })
   }
+})
 
-  // ── BS 2062 — all 12 months (JS lib had Baisakh=30, Jestha=32 — wrong) ───
+// ---------------------------------------------------------------------------
+// adToBs — range errors
+// ---------------------------------------------------------------------------
 
-  const bs2062Months: Array<[number, number, number, number, number]> = [
-    [2005,  4, 14,  1,  1],   // Baisakh 1
-    [2005,  5, 13,  1, 30],   // Baisakh 30
-    [2005,  5, 14,  1, 31],   // Baisakh 31 (last — 31 days NOT 30) [H]
-    [2005,  5, 15,  2,  1],   // Jestha 1 [H]
-    [2005,  6, 14,  2, 31],   // Jestha 31 (last — 31 days NOT 32) [H]
-    [2005,  6, 15,  3,  1],   // Ashadh 1 [H]
-    [2005,  7, 15,  3, 31],   // Ashadh 31 (last)
-    [2005,  7, 16,  4,  1],   // Shrawan 1
-    [2005,  8, 16,  4, 32],   // Shrawan 32 (last — 32-day month)
-    [2005,  8, 17,  5,  1],   // Bhadra 1
-    [2005,  9, 16,  5, 31],   // Bhadra 31 (last)
-    [2005,  9, 17,  6,  1],   // Ashwin 1
-    [2005, 10, 17,  6, 31],   // Ashwin 31 (last)
-    [2005, 10, 18,  7,  1],   // Kartik 1
-    [2005, 11, 15,  7, 29],   // Kartik 29 (last)
-    [2005, 11, 16,  8,  1],   // Mangsir 1
-    [2005, 12, 15,  8, 30],   // Mangsir 30 (last)
-    [2005, 12, 16,  9,  1],   // Poush 1
-    [2006,  1, 13,  9, 29],   // Poush 29 (last)
-    [2006,  1, 14, 10,  1],   // Magh 1
-    [2006,  2, 12, 10, 30],   // Magh 30 (last)
-    [2006,  2, 13, 11,  1],   // Falgun 1
-    [2006,  3, 13, 11, 29],   // Falgun 29 (last)
-    [2006,  3, 14, 12,  1],   // Chaitra 1
-    [2006,  4, 13, 12, 31],   // Chaitra 31 (last)
-  ]
-
-  for (const [ay, am, ad, bm, bd] of bs2062Months) {
-    it(`BS 2062: AD ${ay}-${am}-${ad} = BS 2062-${bm}-${bd}`, () => {
-      expect(adToBs(ay, am, ad)).toEqual({ year: 2062, month: bm, day: bd })
-    })
-  }
-
-  // ── BS 2087 — all 12 months (both libs had wrong month lengths) ───────────
-
-  const bs2087Months: Array<[number, number, number, number, number, number]> = [
-    [2030,  4, 14, 2087,  1,  1],   // Baisakh 1
-    [2030,  5, 14, 2087,  1, 31],   // Baisakh 31 (last)
-    [2030,  5, 15, 2087,  2,  1],   // Jestha 1
-    [2030,  6, 14, 2087,  2, 31],   // Jestha 31 (last)
-    [2030,  6, 15, 2087,  3,  1],   // Ashadh 1
-    [2030,  7, 16, 2087,  3, 32],   // Ashadh 32 (last)
-    [2030,  7, 17, 2087,  4,  1],   // Shrawan 1
-    [2030,  8, 16, 2087,  4, 31],   // Shrawan 31 (last)
-    [2030,  8, 17, 2087,  5,  1],   // Bhadra 1
-    [2030,  9, 16, 2087,  5, 31],   // Bhadra 31 (last)
-    [2030,  9, 17, 2087,  6,  1],   // Ashwin 1
-    [2030, 10, 17, 2087,  6, 31],   // Ashwin 31 (last)
-    [2030, 10, 18, 2087,  7,  1],   // Kartik 1
-    [2030, 11, 16, 2087,  7, 30],   // Kartik 30 (last)
-    [2030, 11, 17, 2087,  8,  1],   // Mangsir 1
-    [2030, 12, 15, 2087,  8, 29],   // Mangsir 29 [H]
-    [2030, 12, 16, 2087,  8, 30],   // Mangsir 30 (last — 30 NOT 29) [H][A]
-    [2030, 12, 17, 2087,  9,  1],   // Poush 1 [H]
-    [2031,  1, 14, 2087,  9, 29],   // Poush 29 [H]
-    [2031,  1, 15, 2087,  9, 30],   // Poush 30 (last — 30 NOT 29) [H][A]
-    [2031,  1, 16, 2087, 10,  1],   // Magh 1 [H]
-    [2031,  2, 14, 2087, 10, 30],   // Magh 30 (last)
-    [2031,  2, 15, 2087, 11,  1],   // Falgun 1
-    [2031,  3, 16, 2087, 11, 30],   // Falgun 30 (last)
-    [2031,  3, 17, 2087, 12,  1],   // Chaitra 1
-    [2031,  4, 15, 2087, 12, 30],   // Chaitra 30 (last)
-    [2031,  4, 16, 2088,  1,  1],   // BS 2088 Baisakh 1 — confirms 2087=367 [A]
-  ]
-
-  for (const [ay, am, ad, by, bm, bd] of bs2087Months) {
-    it(`BS 2087: AD ${ay}-${am}-${ad} = BS ${by}-${bm}-${bd}`, () => {
-      expect(adToBs(ay, am, ad)).toEqual({ year: by, month: bm, day: bd })
-    })
-  }
-
-  // ── Adjacent year rollover checks ─────────────────────────────────────────
-
-  it('last day of BS 2061 → first day of BS 2062', () => {
-    expect(adToBs(2005, 4, 13)).toEqual({ year: 2061, month: 12, day: 31 })
-    expect(adToBs(2005, 4, 14)).toEqual({ year: 2062, month:  1, day:  1 })
-  })
-
-  it('last day of BS 2062 → first day of BS 2063', () => {
-    expect(adToBs(2006, 4, 13)).toEqual({ year: 2062, month: 12, day: 31 })
-    expect(adToBs(2006, 4, 14)).toEqual({ year: 2063, month:  1, day:  1 })
-  })
-
-  it('last day of BS 2087 (367 days) → first day of BS 2088', () => {
-    expect(adToBs(2031, 4, 15)).toEqual({ year: 2087, month: 12, day: 30 })
-    expect(adToBs(2031, 4, 16)).toEqual({ year: 2088, month:  1, day:  1 })
-  })
-
-  // ── Range errors ──────────────────────────────────────────────────────────
+describe('adToBs — range errors', () => {
 
   it('throws RangeError for date before minimum (AD 1918-04-12)', () => {
     expect(() => adToBs(1918, 4, 12)).toThrow(RangeError)
@@ -211,80 +73,27 @@ describe('adToBs', () => {
     expect(() => adToBs(2100, 1, 1)).toThrow(RangeError)
   })
 
-  it('min valid: AD 1918-04-13 succeeds', () => {
-    expect(adToBs(1918, 4, 13)).toEqual({ year: 1975, month: 1, day: 1 })
+  it('year rollover: AD 2005-04-13 = BS 2061-12-31, AD 2005-04-14 = BS 2062-01-01', () => {
+    expect(adToBs(2005, 4, 13)).toEqual({ year: 2061, month: 12, day: 31 })
+    expect(adToBs(2005, 4, 14)).toEqual({ year: 2062, month:  1, day:  1 })
   })
 
-  it('max valid: AD 2044-04-13 succeeds', () => {
-    expect(adToBs(2044, 4, 13)).toEqual({ year: 2100, month: 12, day: 30 })
+  it('year rollover: AD 2006-04-13 = BS 2062-12-31, AD 2006-04-14 = BS 2063-01-01', () => {
+    expect(adToBs(2006, 4, 13)).toEqual({ year: 2062, month: 12, day: 31 })
+    expect(adToBs(2006, 4, 14)).toEqual({ year: 2063, month:  1, day:  1 })
+  })
+
+  it('year rollover: AD 2031-04-15 = BS 2087-12-30 (367-day year), AD 2031-04-16 = BS 2088-01-01', () => {
+    expect(adToBs(2031, 4, 15)).toEqual({ year: 2087, month: 12, day: 30 })
+    expect(adToBs(2031, 4, 16)).toEqual({ year: 2088, month:  1, day:  1 })
   })
 })
 
 // ---------------------------------------------------------------------------
-// bsToAd
+// bsToAd — validation errors
 // ---------------------------------------------------------------------------
 
-describe('bsToAd', () => {
-
-  // ── Reference & known spot checks ─────────────────────────────────────────
-
-  it('[H] reference anchor: BS 1975-01-01 = AD 1918-04-13', () => {
-    expect(bsToAd(1975, 1, 1)).toEqual({ year: 1918, month: 4, day: 13 })
-  })
-
-  it('[H] today: BS 2083-05-11 = AD 2026-08-27', () => {
-    expect(bsToAd(2083, 5, 11)).toEqual({ year: 2026, month: 8, day: 27 })
-  })
-
-  // ── Hamropatro-verified key dates ─────────────────────────────────────────
-
-  it('[H] BS 2062-01-31 = AD 2005-05-14 (Baisakh=31 days)', () => {
-    expect(bsToAd(2062, 1, 31)).toEqual({ year: 2005, month: 5, day: 14 })
-  })
-
-  it('[H] BS 2062-02-01 = AD 2005-05-15', () => {
-    expect(bsToAd(2062, 2, 1)).toEqual({ year: 2005, month: 5, day: 15 })
-  })
-
-  it('[H] BS 2062-02-31 = AD 2005-06-14 (Jestha=31 days)', () => {
-    expect(bsToAd(2062, 2, 31)).toEqual({ year: 2005, month: 6, day: 14 })
-  })
-
-  it('[H] BS 2062-03-01 = AD 2005-06-15', () => {
-    expect(bsToAd(2062, 3, 1)).toEqual({ year: 2005, month: 6, day: 15 })
-  })
-
-  it('[H][A] BS 2087-08-30 = AD 2030-12-16 (Mangsir=30 days)', () => {
-    expect(bsToAd(2087, 8, 30)).toEqual({ year: 2030, month: 12, day: 16 })
-  })
-
-  it('[H] BS 2087-09-01 = AD 2030-12-17 (Poush starts)', () => {
-    expect(bsToAd(2087, 9, 1)).toEqual({ year: 2030, month: 12, day: 17 })
-  })
-
-  it('[H][A] BS 2087-09-30 = AD 2031-01-15 (Poush=30 days)', () => {
-    expect(bsToAd(2087, 9, 30)).toEqual({ year: 2031, month: 1, day: 15 })
-  })
-
-  it('[H] BS 2087-10-01 = AD 2031-01-16 (Magh starts)', () => {
-    expect(bsToAd(2087, 10, 1)).toEqual({ year: 2031, month: 1, day: 16 })
-  })
-
-  it('[A] BS 2088-01-01 = AD 2031-04-16 (confirms BS 2087 = 367 days)', () => {
-    expect(bsToAd(2088, 1, 1)).toEqual({ year: 2031, month: 4, day: 16 })
-  })
-
-  // ── Range boundaries ──────────────────────────────────────────────────────
-
-  it('min: BS 1975-01-01 = AD 1918-04-13', () => {
-    expect(bsToAd(1975, 1, 1)).toEqual({ year: 1918, month: 4, day: 13 })
-  })
-
-  it('max: BS 2100-12-30 = AD 2044-04-13', () => {
-    expect(bsToAd(2100, 12, 30)).toEqual({ year: 2044, month: 4, day: 13 })
-  })
-
-  // ── Validation errors ─────────────────────────────────────────────────────
+describe('bsToAd — validation errors', () => {
 
   it('throws RangeError for year < MIN_BS_YEAR', () => {
     expect(() => bsToAd(1974, 1, 1)).toThrow(RangeError)
@@ -349,8 +158,6 @@ describe('bsToAd', () => {
 
 describe('daysInMonth', () => {
 
-  // ── All 12 months of BS 2083 (current year) ───────────────────────────────
-
   const bs2083DaysPerMonth: Array<[number, number]> = [
     [1, 31], [2, 31], [3, 32], [4, 31],
     [5, 31], [6, 31], [7, 30], [8, 29],
@@ -363,25 +170,21 @@ describe('daysInMonth', () => {
     })
   }
 
-  // ── Known corrected months ────────────────────────────────────────────────
-
-  it('[H] BS 2062 Baisakh = 31 days (JS lib had 30)', () => {
+  it('[✓] BS 2062 Baisakh = 31 days', () => {
     expect(daysInMonth(2062, 1)).toBe(31)
   })
 
-  it('[H] BS 2062 Jestha = 31 days (JS lib had 32)', () => {
+  it('[✓] BS 2062 Jestha = 31 days', () => {
     expect(daysInMonth(2062, 2)).toBe(31)
   })
 
-  it('[H][A] BS 2087 Mangsir = 30 days (Python lib had 29)', () => {
+  it('[✓✓] BS 2087 Mangsir = 30 days', () => {
     expect(daysInMonth(2087, 8)).toBe(30)
   })
 
-  it('[H][A] BS 2087 Poush = 30 days (JS lib had 29)', () => {
+  it('[✓✓] BS 2087 Poush = 30 days', () => {
     expect(daysInMonth(2087, 9)).toBe(30)
   })
-
-  // ── Various years ─────────────────────────────────────────────────────────
 
   it('BS 1975 month 3 (Ashadh) = 32 days', () => {
     expect(daysInMonth(1975, 3)).toBe(32)
@@ -394,8 +197,6 @@ describe('daysInMonth', () => {
   it('BS 2100 month 12 (Chaitra) = 30 days (last month of last year)', () => {
     expect(daysInMonth(2100, 12)).toBe(30)
   })
-
-  // ── Errors ────────────────────────────────────────────────────────────────
 
   it('throws RangeError for year out of range', () => {
     expect(() => daysInMonth(1974, 1)).toThrow(RangeError)
@@ -548,23 +349,23 @@ describe('calendar data integrity', () => {
     }
   })
 
-  it('[H][A] BS 2087 = 367 days total', () => {
+  it('[✓✓] BS 2087 = 367 days total', () => {
     expect(CALENDAR[2087]!.reduce((a, b) => a + b, 0)).toBe(367)
   })
 
-  it('[H][A] BS 2087 month 8 (Mangsir) = 30 days', () => {
+  it('[✓✓] BS 2087 month 8 (Mangsir) = 30 days', () => {
     expect(CALENDAR[2087]![7]).toBe(30)
   })
 
-  it('[H][A] BS 2087 month 9 (Poush) = 30 days', () => {
+  it('[✓✓] BS 2087 month 9 (Poush) = 30 days', () => {
     expect(CALENDAR[2087]![8]).toBe(30)
   })
 
-  it('[H] BS 2062 month 1 (Baisakh) = 31 days', () => {
+  it('[✓] BS 2062 month 1 (Baisakh) = 31 days', () => {
     expect(CALENDAR[2062]![0]).toBe(31)
   })
 
-  it('[H] BS 2062 month 2 (Jestha) = 31 days', () => {
+  it('[✓] BS 2062 month 2 (Jestha) = 31 days', () => {
     expect(CALENDAR[2062]![1]).toBe(31)
   })
 
