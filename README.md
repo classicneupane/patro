@@ -2,22 +2,32 @@
 
 **Nepali Bikram Sambat (BS) ↔ Gregorian (AD) date converter — Python and JavaScript.**
 
-[![PyPI](https://img.shields.io/pypi/v/patro)](https://pypi.org/project/patro/)
-[![npm](https://img.shields.io/npm/v/patro)](https://www.npmjs.com/package/patro)
-[![Python ≥ 3.11](https://img.shields.io/pypi/pyversions/patro)](https://pypi.org/project/patro/)
+![not yet published](https://img.shields.io/badge/PyPI-not%20yet%20published-lightgrey)
+![not yet published](https://img.shields.io/badge/npm-not%20yet%20published-lightgrey)
+[![Python ≥ 3.11](https://img.shields.io/badge/python-%E2%89%A53.11-blue)](https://www.python.org/)
 
 Zero dependencies. Correct calendar data. Covers **BS 1975–2100** (AD 1918–2044).
+
+> **Note:** This package has not yet been published to PyPI or npm. Install from source (see [Development](#development) below).
 
 ---
 
 ## Install
 
+> PyPI and npm releases are coming soon. For now, install from source.
+
 ```bash
 # Python
-pip install patro
+git clone https://github.com/classicneupane/patro.git
+cd patro/packages/python
+uv sync
+uv pip install -e .
 
 # JavaScript / TypeScript
-npm install patro
+git clone https://github.com/classicneupane/patro.git
+cd patro/packages/js
+pnpm install
+pnpm build
 ```
 
 ---
